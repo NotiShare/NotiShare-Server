@@ -38,6 +38,7 @@ app.use(bodyParser.urlencoded({
 
 
 var wsArray = {};
+
 notificationSocket.on("connection", function connection(ws){
 
     ws.on("message", function incoming(message) {
@@ -57,7 +58,6 @@ app.get("/", function (req, res) {
 
 
 app.post("/register", function (req, res) {
-
     var body = req.body;
     var selectQuery = db.query("SELECT userName FROM user WHERE userName = ?", body.userName, function (error, rows, fields) {
         console.log(error);
@@ -65,16 +65,38 @@ app.post("/register", function (req, res) {
             var query = db.query("INSERT INTO user SET ?", body, function (error, result) {
                 console.log(error);
                 if (error === null){
-                    res.status(200);
-                    res.send("registered");
+                    putResponse(200, "Registered", res);
                 }
             });
         }else {
-            res.status(401)
-            res.send("User already exist");
+            putResponse(401, "User already exist", res);
         }
     })
 });
+
+
+app.post("/login", function (req, res) {
+    var body = req.body;
+    var query = db.query("SELECT * FROM user WHERE userName = ?", body.userName, function (error, rows, fields) {
+        if (rows.length !== 0){
+            if ((rows[0].userName === body.userName) && (rows[0].passwordHash === body.passwordHash) ){
+                putResponse(200, "Welcome", res);
+            }else{
+                putResponse(401, "Error. No such user or password");
+            }
+        }else {
+            putResponse(401, "Error. No such user or password", res);
+        }
+    })
+});
+
+
+function putResponse(errorCode, message, res) {
+    res.status(errorCode);
+    res.send(message);
+}
+
+
 
 app.listen(3030, function () {
     console.log("server start");
