@@ -27,6 +27,7 @@ db.connect(function (err) {
     console.log(err);
 });
 var notificationSocket = new WebSocket({port:3031, path: "/notificationSocket"});
+var clipboardSocket = new WebSocket({port:3032, path:"/clipboardSocket"});
 
 var router  = express.Router();
 
@@ -35,6 +36,8 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({
     extended: true
 }));
+
+
 
 
 var wsArray = {};
@@ -47,7 +50,28 @@ notificationSocket.on("connection", function connection(ws){
     ws.on("close", function close() {
         
     });
-    console.log("connected");
+
+    ws.on("open", function open() {
+
+    });
+    console.log("notification connected");
+    ws.send("Hello");
+});
+
+
+clipboardSocket.on("connection", function connection(ws){
+
+    ws.on("message", function incoming(message) {
+
+    });
+    ws.on("close", function close() {
+
+    });
+
+    ws.on("open", function open() {
+
+    });
+    console.log("clipboard connected");
     ws.send("Hello");
 });
 
@@ -82,17 +106,49 @@ app.post("/login", function (req, res) {
             if ((rows[0].userName === body.userName) && (rows[0].passwordHash === body.passwordHash) ){
                 putResponse(200, "Welcome", res);
             }else{
-                putResponse(401, "Error. No such user or password");
+                putResponse(401, "Error. Incorrect auth data", res);
             }
         }else {
-            putResponse(401, "Error. No such user or password", res);
+            putResponse(401, "Error. Incorrect auth data", res);
         }
     })
 });
 
 
-function putResponse(errorCode, message, res) {
-    res.status(errorCode);
+
+app.post("/registerDevice", function (req, res) {
+    var body = req.body;
+    var insertBody = {
+        deviceId: body.deviceId,
+        deviceType: body.deviceType
+    };
+    var query = db.query("SELECT deviceId FROM device WHERE deviceId =?", body.deviceId, function (error, rows, fields) {
+        if (rows.length === 0){
+            var insertQuery = db.query("INSERT INTO device SET ?", insertBody, function (error, result) {
+                console.log(error);
+                var insertedId = result.insertId;
+                var userQuery = db.query("SELECT id FROM user WHERE userName = ?", body.userName, function (error, rows, fields) {
+                    console.log(error);
+                    var insertObject = {
+                        user_id: rows[0].id,
+                        device_id: insertedId
+                    };
+                    var insertUserDevice = db.query("INSERT INTO user_device SET ?", insertObject, function (error, result){
+                        console.log(error);
+                        putResponse(200, "Device registered", res);
+                    });
+                })
+            })
+        }else{
+            putResponse(200, "U are already at the system", res);
+        }
+    })
+});
+
+
+
+function putResponse(code, message, res) {
+    res.status(code);
     res.send(message);
 }
 
