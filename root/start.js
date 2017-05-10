@@ -7,6 +7,7 @@ var mysql = require("mysql");
 
 var app = express();
 
+var urlParse = require("url-parse");
 
 var db = mysql.createConnection({
     host:"127.0.0.1",
@@ -64,7 +65,7 @@ clipboardSocket.on("connection", function connection(ws){
     ws.on("open", function open() {
         wsArray.append(ws);
     });
-
+    var link = urlParse(ws.upgradeReq.url, true);
     console.log("clipboard connected");
     ws.send("Hello");
 });
