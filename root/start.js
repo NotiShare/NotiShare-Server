@@ -56,7 +56,7 @@ notificationSocket.on("connection", function connection(ws){
 clipboardSocket.on("connection", function connection(ws){
 
     ws.on("message", function incoming(message) {
-
+        console.log(message);
     });
     ws.on("close", function close() {
 
@@ -117,8 +117,8 @@ app.post("/registerDevice", function (req, res) {
         deviceId: body.deviceId,
         deviceType: body.deviceType
     };
-    var query = db.query("SELECT deviceId FROM device WHERE deviceId =?", body.deviceId, function (error, rows, fields) {
-        if (rows.length === 0){
+    var query = db.query("SELECT deviceId, id FROM device WHERE deviceId =?", body.deviceId, function (error, rows, fields) {
+        if (rows.length === 0) {
             var insertQuery = db.query("INSERT INTO device SET ?", insertBody, function (error, result) {
                 console.log(error);
                 var insertedId = result.insertId;
@@ -128,16 +128,37 @@ app.post("/registerDevice", function (req, res) {
                         user_id: rows[0].id,
                         device_id: insertedId
                     };
-                    var insertUserDevice = db.query("INSERT INTO user_device SET ?", insertObject, function (error, result){
+                    var insertUserDevice = db.query("INSERT INTO user_device SET ?", insertObject, function (error, result) {
                         console.log(error);
                         putResponse(200, "Device registered", res);
                     });
                 })
             })
-        }else{
-            putResponse(200, "U are already at the system", res);
+        } else {
+            var deviceDbId = rows[0].id;
+            var checkUser = db.query("SELECT id FROM user WHERE userName = ?", body.userName, function (error, rows, fields) {
+
+                var checkDeviceQuery = "SELECT * FROM user_device WHERE user_id = " + rows[0].id + " AND device_id =" + deviceDbId;
+               //var checkDeviceQuery = "SELECT * FROM user_device WHERE user_id = {0} AND device_id = {0}".format(rows[0].id, deviceDbId);
+                var checkDevice = db.query(checkDeviceQuery, function (error, rows, fields) {
+                    if (rows.length === 0) {
+                        var insertObject = {
+                            user_id: rows[0].id,
+                            device_id: deviceDbId
+                        };
+                        var insertUserDevice = db.query("INSERT INTO user_device SET ?", insertObject, function (error, result) {
+                            console.log(error);
+                            putResponse(200, "Device registered", res);
+                        });
+                    }
+                    else {
+                        putResponse(200, "U are already at the system", res);
+                    }
+                });
+
+            })
         }
-    })
+    });
 });
 
 
