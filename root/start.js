@@ -1,15 +1,8 @@
-/**
- * Created by zheny on 09/05/2017.
- */
-
-
-
-
 var express = require("express");
 
 var WebSocket = require("ws").Server;
 
-var bodyParser = require("body-parser")
+var bodyParser = require("body-parser");
 var mysql = require("mysql");
 
 var app = express();
@@ -48,7 +41,7 @@ notificationSocket.on("connection", function connection(ws){
 
     });
     ws.on("close", function close() {
-        
+
     });
 
     ws.on("open", function open() {
@@ -69,8 +62,9 @@ clipboardSocket.on("connection", function connection(ws){
     });
 
     ws.on("open", function open() {
-
+        wsArray.append(ws);
     });
+
     console.log("clipboard connected");
     ws.send("Hello");
 });

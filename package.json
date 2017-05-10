@@ -15,6 +15,7 @@
     "serve-favicon": "~2.4.2",
     "mysql": "^2.13.0",
     "ws": "^2.3.1",
-    "body-parser-json": "^1.9.2"
+    "body-parser-json": "^1.9.2",
+    "express-ws": "^3.0.0"
   }
 }
