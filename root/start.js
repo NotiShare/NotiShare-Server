@@ -34,20 +34,33 @@ app.use(bodyParser.urlencoded({
 
 
 
-var wsArray = [{}];
+var clipboardWsArray = [{}];
+
+var notificationWsArray = [{}];
 
 notificationSocket.on("connection", function connection(ws){
 
+    let link = urlParse(ws.upgradeReq.url, true).query;
     ws.on("message", function incoming(message) {
-
+        console.log(message);
     });
+
     ws.on("close", function close() {
-
+        console.log("close");
+        notificationWsArray.splice(parseSocketArrayForIndex(wsArray, ws), 1);
     });
 
-    ws.on("open", function open() {
-
+    ws.on("error", function (error) {
+        console.log("error");
     });
+
+
+    if (ws.readyState === ws.OPEN) {
+        console.log("opened");
+        let wsObject = { ws: ws, user_id: link.userId, device_id: link.deviceId, type: link.type }
+        notificationWsArray.push(wsObject);
+    }
+
     console.log("notification connected");
     ws.send("Hello");
 });
@@ -55,12 +68,19 @@ notificationSocket.on("connection", function connection(ws){
 
 clipboardSocket.on("connection", function connection(ws){
     let link = urlParse(ws.upgradeReq.url, true).query;
+
     ws.on("message", function incoming(message) {
         console.log(message);
+        var deviceId = parseArrayForWs(clipboardWsArray, ws).device_id;
+        let insertObject = {clipboardText: message, device_id: deviceId}
+        let query = db.query("INSERT INTO clipboard SET ?", insertObject, function (error, result) {
+            console.log(error);
+        })
     });
+
     ws.on("close", function close() {
         console.log("close");
-        wsArray.splice(parseSocketArray(wsArray, ws), 1);
+        clipboardWsArray.splice(parseSocketArrayForIndex(clipboardWsArray, ws), 1);
     });
 
     ws.on("error", function (error) {
@@ -71,22 +91,32 @@ clipboardSocket.on("connection", function connection(ws){
     if (ws.readyState === ws.OPEN) {
         console.log("opened");
         let wsObject = { ws: ws, user_id: link.userId, device_id: link.deviceId, type: link.type }
-        wsArray.push(wsObject);
+        clipboardWsArray.push(wsObject);
     }
 
-
-
     console.log("clipboard connected");
-    ws.send("Hello");
 });
 
 
-function parseSocketArray(wsArray, ws) {
+function parseSocketArrayForIndex(wsArray, ws) {
     var result;
     for (var index = 0 ; index < wsArray.length; index++){
         if (wsArray[index].ws === ws)
         {
             result = index;
+            break;
+        }
+    }
+    return result;
+}
+
+
+function parseArrayForWs(wsArray, ws) {
+    var result;
+    for (var index = 0 ; index < wsArray.length; index++){
+        if (wsArray[index].ws === ws)
+        {
+            result = wsArray[index];
             break;
         }
     }
