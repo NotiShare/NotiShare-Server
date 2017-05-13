@@ -1,15 +1,15 @@
-var express = require("express");
+let express = require("express");
 
-var WebSocket = require("ws").Server;
+let WebSocket = require("ws").Server;
 
-var bodyParser = require("body-parser");
-var mysql = require("mysql");
+let bodyParser = require("body-parser");
+let mysql = require("mysql");
 
-var app = express();
+let app = express();
 
-var urlParse = require("url-parse");
+let urlParse = require("url-parse");
 
-var db = mysql.createConnection({
+let db = mysql.createConnection({
     host:"127.0.0.1",
     port:3306,
     user:"root",
@@ -20,10 +20,9 @@ var db = mysql.createConnection({
 db.connect(function (err) {
     console.log(err);
 });
-var notificationSocket = new WebSocket({port:3031, path: "/notificationSocket"});
-var clipboardSocket = new WebSocket({port:3032, path:"/clipboardSocket"});
+let notificationSocket = new WebSocket({port:3031, path: "/notificationSocket"});
+let clipboardSocket = new WebSocket({port:3032, path:"/clipboardSocket"});
 
-var router  = express.Router();
 
 app.use(bodyParser.json());
 
@@ -65,7 +64,7 @@ clipboardSocket.on("connection", function connection(ws){
     ws.on("open", function open() {
         wsArray.append(ws);
     });
-    var link = urlParse(ws.upgradeReq.url, true);
+    let link = urlParse(ws.upgradeReq.url, true);
     console.log("clipboard connected");
     ws.send("Hello");
 });
@@ -77,11 +76,11 @@ app.get("/", function (req, res) {
 
 
 app.post("/register", function (req, res) {
-    var body = req.body;
-    var selectQuery = db.query("SELECT userName FROM user WHERE userName = ?", body.userName, function (error, rows, fields) {
+    let body = req.body;
+    let selectQuery = db.query("SELECT userName FROM user WHERE userName = ?", body.userName, function (error, rows, fields) {
         console.log(error);
         if (rows.length === 0){
-            var query = db.query("INSERT INTO user SET ?", body, function (error, result) {
+            let query = db.query("INSERT INTO user SET ?", body, function (error, result) {
                 console.log(error);
                 if (error === null){
                     putResponse(200, "Registered", res);
@@ -95,8 +94,8 @@ app.post("/register", function (req, res) {
 
 
 app.post("/login", function (req, res) {
-    var body = req.body;
-    var query = db.query("SELECT * FROM user WHERE userName = ?", body.userName, function (error, rows, fields) {
+    let body = req.body;
+    let query = db.query("SELECT * FROM user WHERE userName = ?", body.userName, function (error, rows, fields) {
         if (rows.length !== 0){
             if ((rows[0].userName === body.userName) && (rows[0].passwordHash === body.passwordHash) ){
                 putResponse(200, "Welcome", res);
@@ -112,47 +111,63 @@ app.post("/login", function (req, res) {
 
 
 app.post("/registerDevice", function (req, res) {
-    var body = req.body;
-    var insertBody = {
+    let body = req.body;
+    let insertBody = {
         deviceId: body.deviceId,
         deviceType: body.deviceType
     };
-    var query = db.query("SELECT deviceId, id FROM device WHERE deviceId =?", body.deviceId, function (error, rows, fields) {
+    let objectToSend = new function () {
+        this.idDevice = null;
+        this.idUser = null;
+        this.message = null;
+    };
+    let query = db.query("SELECT deviceId, id FROM device WHERE deviceId =?", body.deviceId, function (error, rows, fields) {
         if (rows.length === 0) {
-            var insertQuery = db.query("INSERT INTO device SET ?", insertBody, function (error, result) {
+            let insertQuery = db.query("INSERT INTO device SET ?", insertBody, function (error, result) {
                 console.log(error);
-                var insertedId = result.insertId;
-                var userQuery = db.query("SELECT id FROM user WHERE userName = ?", body.userName, function (error, rows, fields) {
+
+                let insertedId = result.insertId;
+                objectToSend.idDevice = insertedId;
+                let userQuery = db.query("SELECT id FROM user WHERE userName = ?", body.userName, function (error, rows, fields) {
                     console.log(error);
-                    var insertObject = {
+                    objectToSend.idUser = rows[0].id;
+                    let insertObject = {
                         user_id: rows[0].id,
                         device_id: insertedId
                     };
-                    var insertUserDevice = db.query("INSERT INTO user_device SET ?", insertObject, function (error, result) {
+                    let insertUserDevice = db.query("INSERT INTO user_device SET ?", insertObject, function (error, result) {
                         console.log(error);
-                        putResponse(200, "Device registered", res);
+                        objectToSend.message = "Device registered";
+                        let resultJson = JSON.stringify(objectToSend);
+                        putResponse(200, resultJson, res);
                     });
                 })
             })
         } else {
-            var deviceDbId = rows[0].id;
-            var checkUser = db.query("SELECT id FROM user WHERE userName = ?", body.userName, function (error, rows, fields) {
-
-                var checkDeviceQuery = "SELECT * FROM user_device WHERE user_id = " + rows[0].id + " AND device_id =" + deviceDbId;
-               //var checkDeviceQuery = "SELECT * FROM user_device WHERE user_id = {0} AND device_id = {0}".format(rows[0].id, deviceDbId);
-                var checkDevice = db.query(checkDeviceQuery, function (error, rows, fields) {
+            let deviceDbId = rows[0].id;
+            let checkUser = db.query("SELECT id FROM user WHERE userName = ?", body.userName, function (error, rows, fields) {
+                let userIdDb = rows[0].id;
+                let checkDevice = db.query("SELECT * FROM user_device WHERE user_id =? AND device_id =?", [rows[0].id, deviceDbId], function (error, rows, fields) {
                     if (rows.length === 0) {
-                        var insertObject = {
-                            user_id: rows[0].id,
+                        let insertObject = {
+                            user_id: userIdDb,
                             device_id: deviceDbId
                         };
-                        var insertUserDevice = db.query("INSERT INTO user_device SET ?", insertObject, function (error, result) {
+                        objectToSend.idUser = userIdDb;
+                        objectToSend.idDevice = deviceDbId;
+                        let insertUserDevice = db.query("INSERT INTO user_device SET ?", insertObject, function (error, result) {
                             console.log(error);
-                            putResponse(200, "Device registered", res);
+                            objectToSend.message = "Device registered";
+                            let resultJson = JSON.stringify(objectToSend);
+                            putResponse(200, resultJson, res);
                         });
                     }
                     else {
-                        putResponse(200, "U are already at the system", res);
+                        objectToSend.idDevice = deviceDbId;
+                        objectToSend.idUser = userIdDb;
+                        objectToSend.message = "U are already at the system";
+                        let resultJson = JSON.stringify(objectToSend);
+                        putResponse(200, resultJson , res);
                     }
                 });
 
