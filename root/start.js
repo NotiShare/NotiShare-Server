@@ -7,6 +7,7 @@ let mysql = require("mysql");
 
 let app = express();
 
+let route = express.Router();
 let urlParse = require("url-parse");
 
 let db = mysql.createConnection({
@@ -33,7 +34,7 @@ app.use(bodyParser.urlencoded({
 
 
 
-var wsArray = {};
+var wsArray = [{}];
 
 notificationSocket.on("connection", function connection(ws){
 
@@ -53,21 +54,44 @@ notificationSocket.on("connection", function connection(ws){
 
 
 clipboardSocket.on("connection", function connection(ws){
-
+    let link = urlParse(ws.upgradeReq.url, true).query;
     ws.on("message", function incoming(message) {
         console.log(message);
     });
     ws.on("close", function close() {
-
+        console.log("close");
+        wsArray.splice(parseSocketArray(wsArray, ws), 1);
     });
 
-    ws.on("open", function open() {
-        wsArray.append(ws);
+    ws.on("error", function (error) {
+       console.log("error");
     });
-    let link = urlParse(ws.upgradeReq.url, true);
+
+
+    if (ws.readyState === ws.OPEN) {
+        console.log("opened");
+        let wsObject = { ws: ws, user_id: link.userId, device_id: link.deviceId, type: link.type }
+        wsArray.push(wsObject);
+    }
+
+
+
     console.log("clipboard connected");
     ws.send("Hello");
 });
+
+
+function parseSocketArray(wsArray, ws) {
+    var result;
+    for (var index = 0 ; index < wsArray.length; index++){
+        if (wsArray[index].ws === ws)
+        {
+            result = index;
+            break;
+        }
+    }
+    return result;
+}
 
 app.get("/", function (req, res) {
     res.status(200);
