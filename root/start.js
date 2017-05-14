@@ -42,12 +42,19 @@ notificationSocket.on("connection", function connection(ws){
 
     let link = urlParse(ws.upgradeReq.url, true).query;
     ws.on("message", function incoming(message) {
+        if (message === null)
+        {
+            return;
+        }
         console.log(message);
+        let currentSocketArray = parseArrayForWs(notificationWsArray, ws);
+        sendDataToAllDevices(currentSocketArray.user_id, notificationWsArray, message, ws);
+
     });
 
     ws.on("close", function close() {
         console.log("close");
-        notificationWsArray.splice(parseSocketArrayForIndex(wsArray, ws), 1);
+        notificationWsArray.splice(parseSocketArrayForIndex(notificationWsArray, ws), 1);
     });
 
     ws.on("error", function (error) {
@@ -62,7 +69,6 @@ notificationSocket.on("connection", function connection(ws){
     }
 
     console.log("notification connected");
-    ws.send("Hello");
 });
 
 
@@ -71,11 +77,13 @@ clipboardSocket.on("connection", function connection(ws){
 
     ws.on("message", function incoming(message) {
         console.log(message);
-        var deviceId = parseArrayForWs(clipboardWsArray, ws).device_id;
-        let insertObject = {clipboardText: message, device_id: deviceId}
+        let currentWs = parseArrayForWs(clipboardWsArray, ws);
+        var deviceId = currentWs.device_id;
+        let insertObject = {clipboardText: message, device_id: deviceId};
+        sendDataToAllDevices(currentWs.user_id, clipboardWsArray, message, ws);
         let query = db.query("INSERT INTO clipboard SET ?", insertObject, function (error, result) {
             console.log(error);
-        })
+        });
     });
 
     ws.on("close", function close() {
@@ -121,6 +129,15 @@ function parseArrayForWs(wsArray, ws) {
         }
     }
     return result;
+}
+
+
+function sendDataToAllDevices(userId, wsArray, message, ws) {
+    wsArray.forEach(function (item, index, array) {
+        if ((item.user_id === userId) && (item.type === "win") && (ws.type !== "win") ){
+            item.ws.send(message);
+        }
+    })
 }
 
 app.get("/", function (req, res) {
