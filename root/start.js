@@ -64,7 +64,7 @@ notificationSocket.on("connection", function connection(ws){
 
     if (ws.readyState === ws.OPEN) {
         console.log("opened");
-        let wsObject = { ws: ws, user_id: link.userId, device_id: link.deviceId, type: link.type }
+        let wsObject = { ws: ws, user_id: link.userId, user_device_id: link.deviceId, type: link.type }
         notificationWsArray.push(wsObject);
     }
 
@@ -98,7 +98,7 @@ clipboardSocket.on("connection", function connection(ws){
 
     if (ws.readyState === ws.OPEN) {
         console.log("opened");
-        let wsObject = { ws: ws, user_id: link.userId, device_id: link.deviceId, type: link.type }
+        let wsObject = { ws: ws, user_id: link.userId, device_id: link.deviceId, type: link.type };
         clipboardWsArray.push(wsObject);
     }
 
@@ -134,7 +134,7 @@ function parseArrayForWs(wsArray, ws) {
 
 function sendDataToAllDevices(userId, wsArray, message, ws) {
     wsArray.forEach(function (item, index, array) {
-        if ((item.user_id === userId) && (item.type === "pc") && (ws.type !== "pc") ){
+        if ((item.user_id === userId) && (item.type === 2) && (ws.type !== 2) ){
             item.ws.send(message);
         }
     })
@@ -212,8 +212,11 @@ app.post("/login", function (req, res) {
     let body = req.body;
     let query = db.query("SELECT DISTINCT user.id FROM user JOIN user_auth ON user_auth.user_name =? AND user_auth.password_hash =? AND user_auth.id = user.user_auth_id", [body.userName, body.passwordHash], function (error, rows, fields) {
         if (rows.length !== 0){
-            //todo put user.id to result;
-                putResponse(200, "Welcome", res);
+            let objectToSend = new function () {
+                this.userId = rows[0].id;
+                this.message = "Welcome";
+            };
+            putResponse(200, JSON.stringify(objectToSend), res);
         }else {
             putResponse(401, "Error. Incorrect auth data", res);
         }
@@ -289,70 +292,18 @@ app.post("/registerDevice", function (req, res) {
                        console.log(error)
                    });
                 }
-
-                //todo put id
+                objectToSend.idUserDevice = user_device_id;
+                objectToSend.message = "Device registered";
+                putResponse(200, JSON.stringify(objectToSend), res);
             })
         }
         else {
-            //todo put id
+            objectToSend.idUserDevice = rows[0].id;
+            objectToSend.message = "Device already registered";
+            putResponse(200, JSON.stringify(objectToSend), res);
         }
     });
 
-
-
-    let query = db.query("SELECT deviceId, id FROM device WHERE deviceId =?", body.deviceId, function (error, rows, fields) {
-        if (rows.length === 0) {
-            let insertQuery = db.query("INSERT INTO device SET ?", insertBody, function (error, result) {
-                console.log(error);
-
-                let insertedId = result.insertId;
-                objectToSend.idDevice = insertedId;
-                let userQuery = db.query("SELECT id FROM user WHERE userName = ?", body.userName, function (error, rows, fields) {
-                    console.log(error);
-                    objectToSend.idUser = rows[0].id;
-                    let insertObject = {
-                        user_id: rows[0].id,
-                        device_id: insertedId
-                    };
-                    let insertUserDevice = db.query("INSERT INTO user_device SET ?", insertObject, function (error, result) {
-                        console.log(error);
-                        objectToSend.message = "Device registered";
-                        let resultJson = JSON.stringify(objectToSend);
-                        putResponse(200, resultJson, res);
-                    });
-                })
-            })
-        } else {
-            let deviceDbId = rows[0].id;
-            let checkUser = db.query("SELECT id FROM user WHERE userName = ?", body.userName, function (error, rows, fields) {
-                let userIdDb = rows[0].id;
-                let checkDevice = db.query("SELECT * FROM user_device WHERE user_id =? AND device_id =?", [rows[0].id, deviceDbId], function (error, rows, fields) {
-                    if (rows.length === 0) {
-                        let insertObject = {
-                            user_id: userIdDb,
-                            device_id: deviceDbId
-                        };
-                        objectToSend.idUser = userIdDb;
-                        objectToSend.idDevice = deviceDbId;
-                        let insertUserDevice = db.query("INSERT INTO user_device SET ?", insertObject, function (error, result) {
-                            console.log(error);
-                            objectToSend.message = "Device registered";
-                            let resultJson = JSON.stringify(objectToSend);
-                            putResponse(200, resultJson, res);
-                        });
-                    }
-                    else {
-                        objectToSend.idDevice = deviceDbId;
-                        objectToSend.idUser = userIdDb;
-                        objectToSend.message = "U are already at the system";
-                        let resultJson = JSON.stringify(objectToSend);
-                        putResponse(200, resultJson , res);
-                    }
-                });
-
-            })
-        }
-    });
 });
 
 
