@@ -199,8 +199,7 @@ app.post("/register", function (req, res) {
                     });
                     return;
                 }
-
-                putResponse(200, "Registered, res");
+                putResponse(200, "Registered", res);
             });
         }else {
             putResponse(401, "User already exist", res);
@@ -223,6 +222,15 @@ app.post("/login", function (req, res) {
 
 
 
+function throwDbError(error) {
+    if (error){
+        console.log(error);
+        db.rollback(function () {
+            throw error;
+        })
+    }
+}
+
 app.post("/registerDevice", function (req, res) {
     let body = req.body;
     let insertBody = {
@@ -233,6 +241,65 @@ app.post("/registerDevice", function (req, res) {
         this.idUserDevice = null;
         this.message = null;
     };
+
+
+    var user_device_id = null;
+
+    let selectDeviceQuery = db.query("SELECT DISTINCT id FROM user_device JOIN device ON user_device.device_id = device.id AND user_auth.user_id=? JOIN device_info ON device_info.deviceId=?", [body.userId, body.deviceId], function (error, rows, field) {
+
+        if (error){
+            console.log(error);
+        }
+
+        if (rows.length === 0){
+            //create device at db
+
+            db.beginTransaction(function (error) {
+                if (error){
+                    console.log(error);
+                    throw error;
+                }
+
+
+                let insertDeviceInfo = db.query("INSERT INTO device_info SET ?", [body.deviceId, body.deviceName], function (error, result) {
+
+                    throwDbError(error);
+
+
+                    let insertDevice = db.query("INSERT INTO device SET ?", [result.insertId, body.deviceType], function (error, result) {
+                        throwDbError(error);
+
+                        let insertUserDevice = db.query("INSERT INTO user_device SET ?", [body.userId, result.insertId], function (error, result) {
+
+                            throwDbError(error);
+
+                            //todo send user_device_id
+                            user_device_id = result.insertId;
+                        })
+                    })
+                })
+            });
+
+
+            db.commit(function (error) {
+
+                if (error){
+                   db.rollback(function () {
+                       putResponse(500, "Bad request", res);
+                       console.log(error)
+                   });
+                }
+
+                //todo put id
+            })
+        }
+        else {
+            //todo put id
+        }
+    });
+
+
+
     let query = db.query("SELECT deviceId, id FROM device WHERE deviceId =?", body.deviceId, function (error, rows, fields) {
         if (rows.length === 0) {
             let insertQuery = db.query("INSERT INTO device SET ?", insertBody, function (error, result) {
