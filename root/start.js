@@ -134,7 +134,7 @@ function parseArrayForWs(wsArray, ws) {
 
 function sendDataToAllDevices(userId, wsArray, message, ws) {
     wsArray.forEach(function (item, index, array) {
-        if ((item.user_id === userId) && (item.type === "win") && (ws.type !== "win") ){
+        if ((item.user_id === userId) && (item.type === "pc") && (ws.type !== "pc") ){
             item.ws.send(message);
         }
     })
@@ -148,14 +148,59 @@ app.get("/", function (req, res) {
 
 app.post("/register", function (req, res) {
     let body = req.body;
-    let selectQuery = db.query("SELECT userName FROM user WHERE userName = ?", body.userName, function (error, rows, fields) {
+    let selectQuery = db.query("SELECT DISTINCT user.id FROM user JOIN user_auth ON user_auth.userName = ? AND user.id = user_auth.id", body.userName, function (error, rows, fields) {
         console.log(error);
         if (rows.length === 0){
-            let query = db.query("INSERT INTO user SET ?", body, function (error, result) {
-                console.log(error);
-                if (error === null){
-                    putResponse(200, "Registered", res);
+
+            db.beginTransaction(function (error) {
+                if (error){
+                    throw error;
                 }
+                let quetyAuth = db.query("INSERT INTO user_auth SET ?", [body.userName, body.passwordHash], function (error, result) {
+                    if (error) {
+                        db.rollback(function () {
+                            throw error;
+                        });
+                    }
+
+                    let userAuthId = result.insertId;
+
+                    let queryProfile = db.query("INSERT INTO profile SET ?", [body.name, body.surname, body.email], function (error, result) {
+
+                            if (error){
+                                db.rollback(function () {
+                                    throw error;
+                                });
+                            }
+                            });
+
+
+                            let profileId = result.insertId;
+
+
+                            let queryAll = db.query("INSERT INTO user SET ?" , [userAuthId, profileId], function (error, result) {
+                                if (error){
+                                    db.rollback(function () {
+                                        throw error;
+                                    })
+                                }
+                            })
+
+                })
+
+            });
+
+            db.commit(function (error) {
+
+                if (error){
+                    db.rollback(function () {
+                        putResponse(500, "Transaction error", res);
+                        console.log(error);
+                    });
+                    return;
+                }
+
+                putResponse(200, "Registered, res");
             });
         }else {
             putResponse(401, "User already exist", res);
@@ -166,13 +211,10 @@ app.post("/register", function (req, res) {
 
 app.post("/login", function (req, res) {
     let body = req.body;
-    let query = db.query("SELECT * FROM user WHERE userName = ?", body.userName, function (error, rows, fields) {
+    let query = db.query("SELECT DISTINCT user.id FROM user JOIN user_auth ON user_auth.user_name =? AND user_auth.password_hash =? AND user_auth.id = user.user_auth_id", [body.userName, body.passwordHash], function (error, rows, fields) {
         if (rows.length !== 0){
-            if ((rows[0].userName === body.userName) && (rows[0].passwordHash === body.passwordHash) ){
+            //todo put user.id to result;
                 putResponse(200, "Welcome", res);
-            }else{
-                putResponse(401, "Error. Incorrect auth data", res);
-            }
         }else {
             putResponse(401, "Error. Incorrect auth data", res);
         }
@@ -188,8 +230,7 @@ app.post("/registerDevice", function (req, res) {
         deviceType: body.deviceType
     };
     let objectToSend = new function () {
-        this.idDevice = null;
-        this.idUser = null;
+        this.idUserDevice = null;
         this.message = null;
     };
     let query = db.query("SELECT deviceId, id FROM device WHERE deviceId =?", body.deviceId, function (error, rows, fields) {
