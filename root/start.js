@@ -46,9 +46,29 @@ notificationSocket.on("connection", function connection(ws){
         {
             return;
         }
-        console.log(message);
+
+        let notificationObject = JSON.parse(message);
         let currentSocketArray = parseArrayForWs(notificationWsArray, ws);
         sendDataToAllDevices(currentSocketArray.user_id, notificationWsArray, message, ws);
+
+        db.beginTransaction(function (error) {
+            if (error){
+                throw error;
+            }
+
+            let query = db.query("INSERT INTO notification_data SET ?",[notificationObject.title, notificationObject.notificationText, notificationObject.image, currentSocketArray.user_device_id] , function (error, result) {
+                throwDbError(error)
+            });
+        });
+
+        db.commit(function (error) {
+
+            if (error){
+                db.rollback(function () {
+                    console.log(error);
+                })
+            }
+        })
 
     });
 
@@ -64,7 +84,7 @@ notificationSocket.on("connection", function connection(ws){
 
     if (ws.readyState === ws.OPEN) {
         console.log("opened");
-        let wsObject = { ws: ws, user_id: link.userId, user_device_id: link.deviceId, type: link.type }
+        let wsObject = { ws: ws, user_id: link.userId, user_device_id: link.userDeviceId, type: link.type }
         notificationWsArray.push(wsObject);
     }
 
@@ -77,13 +97,28 @@ clipboardSocket.on("connection", function connection(ws){
 
     ws.on("message", function incoming(message) {
         console.log(message);
+        let clipboardObject = JSON.parse(message);
         let currentWs = parseArrayForWs(clipboardWsArray, ws);
-        var deviceId = currentWs.device_id;
-        let insertObject = {clipboardText: message, device_id: deviceId};
+        var user_deviceId = currentWs.user_device_id;
         sendDataToAllDevices(currentWs.user_id, clipboardWsArray, message, ws);
-        let query = db.query("INSERT INTO clipboard SET ?", insertObject, function (error, result) {
-            console.log(error);
+        db.beginTransaction(function (error) {
+            if (error){
+                throw error;
+            }
+
+            let query = db.query("INSERT INTO clipboard SET ?",[clipboardObject.clipboardData, clipboardObject.datetimeCreation, user_deviceId, clipboardObject.dataType] , function (error, result) {
+                throwDbError(error)
+            });
         });
+
+        db.commit(function (error) {
+
+            if (error){
+                db.rollback(function () {
+                    console.log(error);
+                })
+            }
+        })
     });
 
     ws.on("close", function close() {
@@ -98,7 +133,7 @@ clipboardSocket.on("connection", function connection(ws){
 
     if (ws.readyState === ws.OPEN) {
         console.log("opened");
-        let wsObject = { ws: ws, user_id: link.userId, device_id: link.deviceId, type: link.type };
+        let wsObject = { ws: ws, user_id: link.userId, user_device_id: link.userDeviceId, type: link.type };
         clipboardWsArray.push(wsObject);
     }
 
@@ -157,34 +192,23 @@ app.post("/register", function (req, res) {
                     throw error;
                 }
                 let quetyAuth = db.query("INSERT INTO user_auth SET ?", [body.userName, body.passwordHash], function (error, result) {
-                    if (error) {
-                        db.rollback(function () {
-                            throw error;
-                        });
-                    }
+                    throwDbError(error)
 
                     let userAuthId = result.insertId;
 
                     let queryProfile = db.query("INSERT INTO profile SET ?", [body.name, body.surname, body.email], function (error, result) {
 
-                            if (error){
-                                db.rollback(function () {
-                                    throw error;
-                                });
-                            }
-                            });
+                            throwDbError(error);
+
 
 
                             let profileId = result.insertId;
 
 
                             let queryAll = db.query("INSERT INTO user SET ?" , [userAuthId, profileId], function (error, result) {
-                                if (error){
-                                    db.rollback(function () {
-                                        throw error;
-                                    })
-                                }
-                            })
+                                throwDbError(error);
+                            });
+                    });
 
                 })
 
