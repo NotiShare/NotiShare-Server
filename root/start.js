@@ -57,7 +57,7 @@ notificationSocket.on("connection", function connection(ws){
             }
             let notification_data = {notification_title: notificationObject.notification_title, notification_text: notificationObject.notification_text, image:  notificationObject.image, user_device_id:currentSocketArray.user_device_id,datetime_sending:notificationObject.datetime_sending  };
             let query = db.query("INSERT INTO notification_data SET ?", notification_data , function (error, result) {
-                throwDbError(error)
+                throwDbError(error);
                 db.commit(function (error) {
 
                     if (error){
@@ -85,7 +85,7 @@ notificationSocket.on("connection", function connection(ws){
 
     if (ws.readyState === ws.OPEN) {
         console.log("opened");
-        let wsObject = { ws: ws, user_id: link.userId, user_device_id: link.userDeviceId, type: link.type }
+        let wsObject = { ws: ws, user_id: link.userId, user_device_id: link.user_device_id, type: link.type }
         notificationWsArray.push(wsObject);
     }
 
@@ -135,7 +135,7 @@ clipboardSocket.on("connection", function connection(ws){
 
     if (ws.readyState === ws.OPEN) {
         console.log("opened");
-        let wsObject = { ws: ws, user_id: link.userId, user_device_id: link.userDeviceId, type: link.type };
+        let wsObject = { ws: ws, user_id: link.user_id, user_device_id: link.user_device_id, type: link.type };
         clipboardWsArray.push(wsObject);
     }
 
@@ -362,21 +362,23 @@ app.post("/registerDevice", function (req, res) {
                                 }
                                 //todo send user_device_id
                                 user_device_id = result.insertId;
-                            });
-                            db.commit(function (error) {
 
-                                if (error) {
-                                    db.rollback(function () {
-                                        putResponse(500, JSON.stringify(objectToSend), JSON.stringify(error_object_to_send));
-                                        console.log(error);
-                                        throw error;
-                                    });
-                                    return;
-                                }
-                                objectToSend.idUserDevice = user_device_id;
-                                objectToSend.message = "Device registered";
-                                putResponse(200, JSON.stringify(objectToSend), res);
+                                db.commit(function (error) {
+
+                                    if (error) {
+                                        db.rollback(function () {
+                                            putResponse(500, JSON.stringify(objectToSend), JSON.stringify(error_object_to_send));
+                                            console.log(error);
+                                            throw error;
+                                        });
+                                        return;
+                                    }
+                                    objectToSend.idUserDevice = user_device_id;
+                                    objectToSend.message = "Device registered";
+                                    putResponse(200, JSON.stringify(objectToSend), res);
+                                });
                             });
+
 
                         })
 
