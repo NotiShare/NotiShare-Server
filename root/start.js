@@ -170,9 +170,9 @@ function parseArrayForWs(wsArray, ws) {
 
 
 function sendDataToAllDevices(userId, wsArray, message, ws) {
-    wsArray.forEach(function (item, index, array) {
-        if ((item.user_id === userId) && (item.type === 2) && (ws.type !== 2) ){
-            item.ws.send(message);
+    wsArray.forEach(function (currentValue, index, array) {
+        if ((currentValue.user_id === userId) && (currentValue.type === '2')){
+            currentValue.ws.send(message);
         }
     })
 }
